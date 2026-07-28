@@ -44,6 +44,7 @@ docs/
   ARCHITECTURE.md        Decision records for every PRD gap/conflict found
   API_CONTRACT.md         Integration contract for Team 1 / Team 3
   PRD_GAP_LOG.md          Quick index into ARCHITECTURE.md
+  DEPLOYMENT.md            Checklist for a real hosted deployment (DB, object storage, backend, frontend)
   source-materials/       Original PRD, RGD, agile plan, architecture doc
 .github/workflows/ci.yml  Backend tests (against Postgres) + frontend build
 ```

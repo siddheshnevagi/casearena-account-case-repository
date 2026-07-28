@@ -1,11 +1,11 @@
 """File storage abstraction for uploaded case PDFs.
 
-Local dev writes to disk. The architecture document specifies Google Cloud
-Storage for production ("Store PDFs, documents, uploads"); this module's
-code never depends on the filesystem beyond this file — everywhere else in
-the app deals in an opaque ``storage_key`` string. Swapping in a GCS-backed
-implementation later means adding one class here and changing which one
-``get_storage()`` returns; no router or model changes.
+Local dev writes to disk; production writes to S3 (or any S3-compatible
+object store — Cloudflare R2, etc.), selected by ``STORAGE_BACKEND``.
+Everywhere else in the app deals only in an opaque ``storage_key`` string,
+so this is the only file that knows where bytes actually live. Adding a
+future backend means adding one class here and one branch in
+``get_storage()``; no router or model changes.
 """
 from __future__ import annotations
 
@@ -58,11 +58,71 @@ class LocalDiskStorage(Storage):
             path.unlink()
 
 
+class S3CompatibleStorage(Storage):
+    """Works against real AWS S3 or any S3-compatible provider (Cloudflare
+    R2, MinIO, ...) by pointing ``endpoint_url`` at that provider — R2 in
+    particular needs this since it speaks the S3 API but isn't AWS.
+    """
+
+    def __init__(
+        self,
+        bucket: str,
+        region: str,
+        access_key_id: str,
+        secret_access_key: str,
+        endpoint_url: str | None = None,
+    ) -> None:
+        import boto3
+
+        self._bucket = bucket
+        self._client = boto3.client(
+            "s3",
+            region_name=region,
+            aws_access_key_id=access_key_id,
+            aws_secret_access_key=secret_access_key,
+            endpoint_url=endpoint_url or None,
+        )
+
+    def save(self, content: bytes, original_filename: str) -> str:
+        suffix = Path(original_filename).suffix
+        storage_key = f"{uuid.uuid4().hex}{suffix}"
+        self._client.put_object(
+            Bucket=self._bucket,
+            Key=storage_key,
+            Body=content,
+            ContentType="application/pdf",
+        )
+        return storage_key
+
+    def read(self, storage_key: str) -> bytes:
+        response = self._client.get_object(Bucket=self._bucket, Key=storage_key)
+        return response["Body"].read()
+
+    def delete(self, storage_key: str) -> None:
+        # S3's delete_object is idempotent — deleting a key that doesn't
+        # exist returns success rather than raising, matching
+        # LocalDiskStorage.delete's "no-op if absent" behavior.
+        self._client.delete_object(Bucket=self._bucket, Key=storage_key)
+
+
 _storage_instance: Storage | None = None
 
 
 def get_storage() -> Storage:
     global _storage_instance
     if _storage_instance is None:
-        _storage_instance = LocalDiskStorage(settings.upload_storage_dir)
+        if settings.storage_backend == "s3":
+            if not settings.s3_bucket_name:
+                raise RuntimeError(
+                    "STORAGE_BACKEND=s3 requires S3_BUCKET_NAME to be set"
+                )
+            _storage_instance = S3CompatibleStorage(
+                bucket=settings.s3_bucket_name,
+                region=settings.s3_region,
+                access_key_id=settings.s3_access_key_id,
+                secret_access_key=settings.s3_secret_access_key,
+                endpoint_url=settings.s3_endpoint_url,
+            )
+        else:
+            _storage_instance = LocalDiskStorage(settings.upload_storage_dir)
     return _storage_instance

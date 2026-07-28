@@ -36,6 +36,17 @@ class Settings(BaseSettings):
     max_upload_size_bytes: int = 10 * 1024 * 1024
     upload_storage_dir: str = "./storage/uploads"
 
+    # "local" (disk, dev-only — wiped on redeploy on most hosts) or "s3"
+    # (real AWS S3, or an S3-compatible provider like Cloudflare R2 via
+    # s3_endpoint_url). Required for any deployment where uploads must
+    # survive a restart.
+    storage_backend: str = "local"
+    s3_bucket_name: str = ""
+    s3_region: str = "auto"
+    s3_access_key_id: str = ""
+    s3_secret_access_key: str = ""
+    s3_endpoint_url: str = ""  # leave blank for real AWS S3; set for R2/MinIO/etc.
+
     # CORS — the frontend origin(s) allowed to call this API
     cors_allow_origins: list[str] = ["http://localhost:5173"]
 

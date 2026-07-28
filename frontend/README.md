@@ -31,6 +31,12 @@ npm run build      # outputs to dist/
 npm run preview    # serve the production build locally
 ```
 
+`VITE_API_BASE_URL` is baked into the static build at build time, not read
+at runtime — set it in your hosting provider's environment variables
+*before* the first production build, not after. See
+[`../docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md) for the full production
+deployment checklist (Vercel, plus the backend/database/storage it talks to).
+
 ## Project structure
 
 ```

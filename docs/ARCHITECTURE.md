@@ -163,6 +163,40 @@ guesstimates, RCA), which is a taxonomy change requiring Team 1
 sign-off (schema freeze), not something this module should do unilaterally
 mid-MVP.
 
+## ADR-07: Demo hosting — Neon/R2/Render/Vercel in place of Cloud SQL/GCS/Cloud Run
+
+**Context.** ADR-01 commits this module to Postgres, matching the
+product-wide architecture doc's Google Cloud SQL + Cloud Run + Google
+Cloud Storage target. For an early product demo, standing up real GCP
+infrastructure (a Cloud SQL instance, a GCS bucket + service account, a
+Cloud Run deploy pipeline) is more setup than a same-day demo affords, and
+no team member had it configured yet.
+
+**Decision.** Demo/staging deployments use **Neon** (managed Postgres),
+**Cloudflare R2** (S3-compatible object storage) or real AWS S3, **Render**
+(Docker container hosting) and **Vercel** (static frontend hosting) — see
+`docs/DEPLOYMENT.md` for the exact setup. Production/launch is expected to
+move to the GCP stack ADR-01 and the architecture doc specify, once
+someone owns provisioning it.
+
+**Why this doesn't contradict ADR-01.** Nothing in this module's code
+talks to Postgres or object storage in a provider-specific way:
+`backend/app/database.py` takes any `DATABASE_URL` SQLAlchemy understands
+(Neon's Postgres is wire-compatible with Cloud SQL's — same engine, same
+driver), and `backend/app/services/storage.py`'s `S3CompatibleStorage`
+talks the S3 API, which GCS also supports via its
+[S3-compatibility mode](https://cloud.google.com/storage/docs/interoperability)
+if a future migration needs it. Swapping either later is an environment
+variable change (`DATABASE_URL`, `STORAGE_BACKEND` + the `S3_*` vars), not
+a code change — the same property ADR-01's "Consequence" section already
+called out for Postgres, extended here to storage.
+
+**Consequence.** Whoever owns the real launch environment should treat
+`docs/DEPLOYMENT.md` as a placeholder to replace with GCP-specific
+provisioning steps (Cloud SQL instance creation, a GCS bucket + IAM
+service account, Cloud Run deploy config) — not as the final production
+setup.
+
 ## Summary for integrators (Team 1 / Team 3)
 
 - Auth: JWT bearer tokens issued by this module's `/auth/login`; see
