@@ -1,27 +1,25 @@
+# Render Blueprint for the Module 2 API.
+#
+# plan: free is deliberate — see docs/DEPLOYMENT.md. Free instances spin
+# down after 15 minutes idle and take ~1 minute to wake, which the
+# deployment guide covers with a keep-warm ping before a demo.
 services:
   - type: web
     name: casearena-backend
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
-    plan: starter
+    plan: free
     healthCheckPath: /health
     envVars:
+      # Bytes in Postgres — no object-storage account needed (ADR-07).
       - key: STORAGE_BACKEND
-        value: s3
+        value: database
+      # sync: false = Render prompts for the value instead of storing it
+      # in this file. Never commit real credentials here.
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET_KEY
         sync: false
       - key: CORS_ALLOW_ORIGINS
-        sync: false
-      - key: S3_BUCKET_NAME
-        sync: false
-      - key: S3_REGION
-        sync: false
-      - key: S3_ACCESS_KEY_ID
-        sync: false
-      - key: S3_SECRET_ACCESS_KEY
-        sync: false
-      - key: S3_ENDPOINT_URL
         sync: false

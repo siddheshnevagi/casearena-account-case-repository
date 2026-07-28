@@ -163,39 +163,55 @@ guesstimates, RCA), which is a taxonomy change requiring Team 1
 sign-off (schema freeze), not something this module should do unilaterally
 mid-MVP.
 
-## ADR-07: Demo hosting — Neon/R2/Render/Vercel in place of Cloud SQL/GCS/Cloud Run
+## ADR-07: Demo hosting under a zero-budget constraint
 
 **Context.** ADR-01 commits this module to Postgres, matching the
 product-wide architecture doc's Google Cloud SQL + Cloud Run + Google
-Cloud Storage target. For an early product demo, standing up real GCP
-infrastructure (a Cloud SQL instance, a GCS bucket + service account, a
-Cloud Run deploy pipeline) is more setup than a same-day demo affords, and
-no team member had it configured yet.
+Cloud Storage target. Two constraints applied to the first live demo:
+nobody had GCP provisioned yet, and the team had **no budget at all** —
+not "keep it cheap", but zero spend, and in practice also no willingness
+to put a card on file (several "free tier" products still require one).
 
-**Decision.** Demo/staging deployments use **Neon** (managed Postgres),
-**Cloudflare R2** (S3-compatible object storage) or real AWS S3, **Render**
-(Docker container hosting) and **Vercel** (static frontend hosting) — see
-`docs/DEPLOYMENT.md` for the exact setup. Production/launch is expected to
-move to the GCP stack ADR-01 and the architecture doc specify, once
-someone owns provisioning it.
+**Decision.** Demo deployments use **Neon** (free managed Postgres),
+**Render**'s free Docker instances for the API, **Vercel** Hobby for the
+frontend, and store uploaded PDFs **as bytes in Postgres**
+(`STORAGE_BACKEND=database`) rather than in object storage. See
+`docs/DEPLOYMENT.md`. None of these require a payment method.
 
-**Why this doesn't contradict ADR-01.** Nothing in this module's code
-talks to Postgres or object storage in a provider-specific way:
-`backend/app/database.py` takes any `DATABASE_URL` SQLAlchemy understands
-(Neon's Postgres is wire-compatible with Cloud SQL's — same engine, same
-driver), and `backend/app/services/storage.py`'s `S3CompatibleStorage`
-talks the S3 API, which GCS also supports via its
-[S3-compatibility mode](https://cloud.google.com/storage/docs/interoperability)
-if a future migration needs it. Swapping either later is an environment
-variable change (`DATABASE_URL`, `STORAGE_BACKEND` + the `S3_*` vars), not
-a code change — the same property ADR-01's "Consequence" section already
-called out for Postgres, extended here to storage.
+**Why PDFs in the database.** The obvious choice was Cloudflare R2 (free
+10 GB, S3-compatible, and `S3CompatibleStorage` already supports it), but
+R2 requires a card on file to activate. Storing bytes in Postgres removes
+the entire second vendor: no extra account, no access keys, one fewer
+thing that can be misconfigured under time pressure. At demo volumes — a
+handful of PDFs of a few MB each against Neon's 0.5 GB — the usual
+objections don't bite yet.
 
-**Consequence.** Whoever owns the real launch environment should treat
-`docs/DEPLOYMENT.md` as a placeholder to replace with GCP-specific
-provisioning steps (Cloud SQL instance creation, a GCS bucket + IAM
-service account, Cloud Run deploy config) — not as the final production
-setup.
+They do bite later, and deliberately so: bytes in the database inflate
+backups, every download flows through the app process, and there is no CDN.
+`DatabaseStorage` documents this in its own docstring so the next person
+doesn't mistake it for an endorsement. The migration path is
+`STORAGE_BACKEND=s3` plus a one-time copy of `case_files` rows into a
+bucket; `cases.storage_key` is backend-agnostic, so no schema change is
+involved.
+
+**Why this doesn't contradict ADR-01.** Nothing in this module talks to
+Postgres or object storage in a provider-specific way.
+`backend/app/database.py` accepts any `DATABASE_URL` SQLAlchemy
+understands, and Neon is the same Postgres engine and driver Cloud SQL
+would be. `S3CompatibleStorage` speaks the S3 API, which GCS also supports
+via its
+[S3-compatibility mode](https://cloud.google.com/storage/docs/interoperability).
+Swapping either is an environment-variable change, not a code change —
+the same property ADR-01's "Consequence" section claimed for the database,
+now extended to storage and enforced by the `Storage` ABC.
+
+**Consequence.** `docs/DEPLOYMENT.md` describes a demo deployment, not a
+production one, and says so. Whoever owns the real launch environment
+should replace it with GCP provisioning steps (Cloud SQL, a GCS bucket +
+IAM service account, Cloud Run) and move PDF bytes out of Postgres as part
+of that work. Render's free tier in particular is unsuitable for anything
+beyond a demo: it sleeps after 15 minutes idle with a ~1 minute cold start,
+and is capped at 750 instance-hours per month.
 
 ## Summary for integrators (Team 1 / Team 3)
 

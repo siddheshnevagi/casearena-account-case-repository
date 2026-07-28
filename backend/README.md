@@ -71,13 +71,13 @@ app/
   main.py            FastAPI app instance, CORS, router wiring
   config.py           Settings (env-driven), see .env.example
   database.py          SQLAlchemy engine/session, Base
-  models/               SQLAlchemy ORM models (User, Profile, Case)
+  models/               SQLAlchemy ORM models (User, Profile, Case, CaseFile)
   schemas/               Pydantic request/response models
   core/
     security.py           Password hashing, JWT issuing/verification
     deps.py                 get_current_user / get_current_admin dependencies
   services/
-    storage.py            File storage abstraction (local disk, or S3/R2 — see STORAGE_BACKEND)
+    storage.py            File storage abstraction — local disk / Postgres / S3 (STORAGE_BACKEND)
     cases.py                Shared case-presentation/matching helpers
   routers/
     auth.py                signup / verify / login / refresh / me
@@ -115,14 +115,20 @@ codebase reads an environment variable that isn't listed there — if you add
 one, add it to both `.env.example` and `app/config.py`'s `Settings` class in
 the same commit.
 
-## Deploying to production
+## Deploying
 
-See [`../docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md) for the full checklist
-(managed Postgres, S3/R2 object storage, hosting the API, hosting the
-frontend). The short version: never run this in production with
-`DATABASE_URL=sqlite:...` or `STORAGE_BACKEND=local` — the first loses
-durability guarantees the PRD assumes, the second silently loses every
-uploaded PDF on the next redeploy.
+See [`../docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md) for a full, zero-cost
+hosted deployment (Neon Postgres + Render + Vercel).
+
+Two settings that must change from their dev defaults in any deployment:
+
+- `DATABASE_URL` — never SQLite outside local smoke tests.
+- `STORAGE_BACKEND` — never `local`. Most hosts wipe local disk on
+  redeploy, silently destroying every uploaded PDF. Use `database`
+  (bytes in Postgres, no extra vendor) or `s3` (see ADR-07 for when to
+  prefer which).
+- `JWT_SECRET_KEY` — the default is public in this repo; anyone with it
+  can mint valid tokens.
 
 ## Integrating from Team 1 / Team 3
 

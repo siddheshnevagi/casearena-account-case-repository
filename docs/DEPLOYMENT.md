@@ -1,158 +1,197 @@
-# Production deployment — Module 2 (Account Management & Case Repository)
+# Deployment — Module 2 (Account Management & Case Repository)
 
-Four pieces, in this order (each step needs a value produced by the one
-before it):
+This guide deploys the app at **zero cost, with no credit card required**
+at any step.
 
-1. **Database** — Neon (managed Postgres)
-2. **Object storage** — Cloudflare R2 (S3-compatible; real AWS S3 also works, see the note in step 2)
-3. **Backend** — Render (Docker, runs `backend/Dockerfile` as-is)
-4. **Frontend** — Vercel (static Vite build)
+| Piece | Service | Cost | Card needed? |
+|---|---|---|---|
+| Database | Neon (managed Postgres) | Free — 0.5 GB | No |
+| PDF storage | The Postgres database itself | Free — no extra service | No |
+| Backend API | Render (Docker, free instance) | Free — 750 hrs/month | No¹ |
+| Frontend | Vercel (Hobby) | Free | No |
 
-None of these steps can be done by an AI agent on your behalf — each is a
-real account signup / real payment method / real API credential, which is
-exactly the kind of thing that has to be a human, deliberate action. This
-doc is the checklist; you click through it.
+¹ Render does not require a card for free web services. If yours ever
+asks for one, stop and see [If Render asks for a card](#if-render-asks-for-a-card).
 
-**Before you start:** this replaces Codespaces as the source of truth.
-Once deployed, `git push` to `main` auto-redeploys both Render and Vercel
-(once you connect them, which is the default when importing from GitHub) —
-no more manual restarts or copying `.env.example`.
+**Why PDFs go in Postgres here:** object storage (S3, Cloudflare R2) is the
+right answer at scale, but R2 requires a payment method on file even on its
+free tier, and every extra vendor is another set of credentials that can be
+wrong at 11pm the night before a demo. `STORAGE_BACKEND=database` stores
+uploaded bytes in the database the app is already connected to — no second
+account, no keys. The S3 path is fully implemented and one env var away when
+you outgrow this; see ARCHITECTURE.md ADR-07 for the tradeoff in full.
+
+Steps are ordered by dependency — each one needs a value the previous
+produced. Budget ~25 minutes total.
 
 ---
 
 ## Step 1 — Database: Neon
 
-1. Go to **https://neon.tech** → sign up (GitHub OAuth is fastest).
-2. Create a project (e.g. `casearena`).
-3. Neon shows a connection string like:
+1. Go to **https://neon.com** → **Sign up** (GitHub OAuth is fastest).
+2. Create a project, e.g. `casearena`.
+3. Copy the connection string it shows you. It looks like:
    ```
-   postgres://<user>:<password>@<host>/<dbname>?sslmode=require
+   postgresql://<user>:<password>@<host>/<db>?sslmode=require
    ```
-4. **Edit the scheme** — SQLAlchemy needs the `psycopg2` driver named
-   explicitly. Change `postgres://` to `postgresql+psycopg2://` at the
-   very start, keep everything else (including `?sslmode=require`) as-is:
+4. **Change the scheme** — SQLAlchemy needs the driver named explicitly.
+   Replace the leading `postgresql://` with `postgresql+psycopg2://`,
+   leaving everything else (including `?sslmode=require`) untouched:
    ```
-   postgresql+psycopg2://<user>:<password>@<host>/<dbname>?sslmode=require
+   postgresql+psycopg2://<user>:<password>@<host>/<db>?sslmode=require
    ```
-5. Save this string — it's your `DATABASE_URL` in Step 3.
+5. Keep this handy — it is your `DATABASE_URL` for Steps 2 and 3.
 
-## Step 2 — Object storage: Cloudflare R2
+> Neon's free compute sleeps after 5 minutes idle and wakes in well under a
+> second, so this is invisible in normal use.
 
-Local disk storage (this app's dev default) gets wiped on almost every
-PaaS redeploy or restart — silently deleting every uploaded PDF. Real
-object storage is not optional for a hosted deployment.
+## Step 2 — Create the tables
 
-1. Go to **https://dash.cloudflare.com** → sign up → **R2** in the sidebar.
-2. Create a bucket (e.g. `casearena-cases`).
-3. **Manage R2 API Tokens** → create a token with **Object Read & Write**,
-   scoped to that bucket.
-4. Note down: **Access Key ID**, **Secret Access Key**, and your
-   **Account ID** (shown on the R2 overview page).
-5. Your values for Step 3:
-   ```
-   STORAGE_BACKEND=s3
-   S3_BUCKET_NAME=casearena-cases
-   S3_REGION=auto
-   S3_ACCESS_KEY_ID=<access key id>
-   S3_SECRET_ACCESS_KEY=<secret access key>
-   S3_ENDPOINT_URL=https://<account-id>.r2.cloudflarestorage.com
-   ```
+Render's free instances have no shell, so run migrations from your
+Codespace (it already has Python and Alembic installed, and Neon is
+reachable from anywhere). In the Codespace terminal:
 
-**Prefer real AWS S3 instead?** Create a bucket + an IAM user scoped to
-`s3:PutObject`/`s3:GetObject`/`s3:DeleteObject` on it, leave
-`S3_ENDPOINT_URL` blank, set `S3_REGION` to the bucket's real AWS region
-(e.g. `us-east-1`). The code path is identical either way — see
-`backend/app/services/storage.py`'s `S3CompatibleStorage`.
+```bash
+cd backend
+DATABASE_URL='postgresql+psycopg2://...your neon string...' alembic upgrade head
+```
+
+Quote the string — it contains characters the shell would otherwise
+interpret. You should see Alembic apply revisions `0001` and `0002`.
+
+This is a one-time step. It is deliberately not automatic on container
+boot, so a bad migration can never get half-applied by a restart.
 
 ## Step 3 — Backend: Render
 
-1. Go to **https://render.com** → sign up → connect your GitHub account,
-   authorize access to `casearena-account-case-repository`.
-2. **New +** → **Blueprint** → select this repo. Render should detect
-   `render.yaml` at the repo root and prompt you for the env vars it marks
-   `sync: false`.
-   (If Blueprint doesn't pick it up: **New +** → **Web Service** → select
-   the repo → **Root Directory**: `backend` → **Runtime**: `Docker`.)
-3. **Plan: choose Starter, not Free.** Render's free tier spins the
-   service down after 15 minutes of inactivity — the first request after
-   that is a 30–60 second cold start. For a live demo, that's a real risk
-   of an audience staring at a spinner. Starter is a few dollars for the
-   day; you can downgrade or delete the service right after.
-4. Fill in the environment variables:
-   - `DATABASE_URL` = the Neon string from Step 1
-   - `JWT_SECRET_KEY` = a real random secret — generate one anywhere with
-     `python3 -c "import secrets; print(secrets.token_urlsafe(48))"`,
-     e.g. in the Codespace terminal
-   - `S3_BUCKET_NAME`, `S3_REGION`, `S3_ACCESS_KEY_ID`,
-     `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT_URL` = from Step 2
-   - `CORS_ALLOW_ORIGINS` — leave a placeholder like `["https://placeholder.vercel.app"]`
-     for now; you'll come back and set the real Vercel URL after Step 4
-5. Deploy. Render gives you a URL like `https://casearena-backend.onrender.com`.
-6. **Run migrations against the new database** — Render dashboard → your
-   service → **Shell** tab (runs inside the live container, `DATABASE_URL`
-   already set):
+1. Go to **https://render.com** → sign up → connect GitHub, authorizing
+   access to `casearena-account-case-repository`.
+2. **New +** → **Blueprint** → pick this repo. Render reads `render.yaml`
+   from the repo root and will prompt for the values marked `sync: false`.
+   (Fallback if Blueprint isn't detected: **New +** → **Web Service** →
+   this repo → Root Directory `backend`, Runtime `Docker`, Instance Type
+   **Free**, and add the env vars below by hand.)
+3. Confirm the instance type is **Free**.
+4. Set the environment variables:
+
+   | Variable | Value |
+   |---|---|
+   | `DATABASE_URL` | the Neon string from Step 1 |
+   | `JWT_SECRET_KEY` | a real random secret — see below |
+   | `CORS_ALLOW_ORIGINS` | `["https://placeholder.vercel.app"]` for now; fixed in Step 4 |
+
+   `STORAGE_BACKEND=database` is already set by `render.yaml` — leave it.
+
+   Generate the JWT secret in your Codespace terminal:
    ```bash
-   alembic upgrade head
+   python3 -c "import secrets; print(secrets.token_urlsafe(48))"
    ```
-7. Confirm: visit `https://casearena-backend.onrender.com/health` →
-   should return `{"status":"ok"}`. Then `/docs` for the Swagger UI.
+   Do not reuse the `dev-only-secret-change-me` default; it is public in
+   this repo, and anyone with it can mint valid tokens for your API.
+
+5. Deploy. You get a URL like `https://casearena-backend.onrender.com`.
+6. Verify: open `<your-render-url>/health` → `{"status":"ok"}`.
+   Then `/docs` for the Swagger UI.
 
 ## Step 4 — Frontend: Vercel
 
 1. Go to **https://vercel.com/new** → import
-   `casearena-account-case-repository`.
-2. Framework preset: **Vite**. Root Directory: `frontend`. Build command
-   and output directory are Vite's defaults (`npm run build`, `dist`) —
-   no changes needed.
-3. **Environment Variables** (this is a build-time value — Vite bakes
-   `VITE_*` vars into the static bundle, so it must be set *before* the
-   first deploy, not edited into the running site after):
+   `casearena-account-case-repository` (sign in with GitHub).
+2. **Root Directory**: `frontend`. Framework preset should auto-detect as
+   **Vite**; build command `npm run build` and output `dist` are correct
+   defaults — leave them.
+3. **Environment Variables** — add before deploying:
    ```
-   VITE_API_BASE_URL=https://casearena-backend.onrender.com
+   VITE_API_BASE_URL = https://casearena-backend.onrender.com
    ```
-   (your actual Render URL from Step 3)
-4. Deploy. Vercel gives you a URL like `https://casearena-....vercel.app`.
-5. **Go back to Render** and update `CORS_ALLOW_ORIGINS` to the real
-   Vercel URL:
+   (your real Render URL from Step 3)
+
+   This must be set *before* the first build. Vite bakes `VITE_*` values
+   into the static bundle at build time; editing it afterwards does
+   nothing until you redeploy.
+4. Deploy. You get a URL like `https://casearena-xyz.vercel.app`.
+5. **Return to Render** → your service → **Environment** → set
+   `CORS_ALLOW_ORIGINS` to your real Vercel URL:
    ```
-   CORS_ALLOW_ORIGINS=["https://casearena-....vercel.app"]
+   ["https://casearena-xyz.vercel.app"]
    ```
-   Env var changes on Render require a redeploy to take effect — trigger
-   one from the dashboard (Manual Deploy → Deploy latest commit).
+   Save. Render redeploys automatically on env var changes; wait for it to
+   go green before testing. Without this the browser blocks every API call
+   with a CORS error.
 
-## Step 5 — Smoke test before the demo, not during it
+## Step 5 — Smoke test tonight, not tomorrow
 
-Run this whole list yourself, tonight, not tomorrow morning:
+Run this whole list yourself, now. Every item has caught a real bug at
+some point in this project.
 
-- [ ] Visit the Vercel URL, sign up a fresh account
-- [ ] Complete onboarding
-- [ ] Upload `backend/seed-data/sample-profitability-case.pdf` (and a
-      couple more PDFs with different case types/difficulties, for
-      testing filters)
-- [ ] Share a case, confirm it shows up under Community
-- [ ] **Hard-refresh the page entirely**, or reopen in a new browser —
-      confirm the case and its PDF still load. This is the real test that
-      storage is actually on R2/S3 and not silently falling back to local
-      disk (which would still work *during* the same server process, but
-      vanish on Render's next restart)
-- [ ] Try case type / difficulty filters and search
-- [ ] Sign up a second account, confirm ownership restrictions (no
-      edit/delete/share on another user's case)
-- [ ] If demoing admin moderation: see below
+- [ ] Open the Vercel URL → sign up a fresh account
+- [ ] Complete onboarding (pick Consulting + a couple of case preferences)
+- [ ] Upload `backend/seed-data/sample-profitability-case.pdf`
+- [ ] Upload 3–4 more PDFs with **different case types and difficulties** —
+      you need variety to demo filters convincingly
+- [ ] Open a case → **View PDF** → confirm it actually renders
+- [ ] Share a case → confirm it appears under Community
+- [ ] **Close the browser entirely, reopen, log back in, open the PDF
+      again.** This is the real durability check — it proves bytes came
+      back out of Postgres rather than out of a process that is about to
+      be recycled
+- [ ] Repository: try case-type filter, difficulty filter, and search
+      (3+ characters)
+- [ ] Set filters that match nothing → confirm the empty state + reset
+- [ ] Sign up a **second** account → confirm the first user's shared case
+      is visible but has **no** edit/delete/share buttons
+- [ ] Log out, fail a login 5× → confirm the lockout message
 
-### Promoting an admin in production
+### Promoting an admin (only if demoing moderation)
 
-`backend/scripts/promote_admin.py` needs direct DB access — there's
-deliberately no API for this (see the script's docstring). From Render's
-**Shell** tab:
+Same pattern as migrations — run it from the Codespace against Neon:
+
 ```bash
-python scripts/promote_admin.py <email>
+cd backend
+DATABASE_URL='postgresql+psycopg2://...' python scripts/promote_admin.py you@example.com
 ```
 
-## If something breaks right before the demo
+## Demo-day operational notes
 
-- **Render**: dashboard → your service → **Events** tab → redeploy the
-  last known-good deploy.
-- **Vercel**: dashboard → your project → **Deployments** tab → pick any
-  previous deployment → **Promote to Production**.
-- Both take under a minute and don't require touching code.
+**Warm it up first.** Render free instances spin down after 15 minutes
+idle; the next request takes ~1 minute while it wakes, and the audience
+watches a loading page. Five minutes before you present, open
+`<your-render-url>/health` and then the Vercel URL, and click through one
+page. Both stay warm as long as you keep using them.
+
+Optionally, keep it awake across the whole demo window with a free pinger
+(**https://cron-job.org** or UptimeRobot's free tier) hitting
+`<your-render-url>/health` every 10 minutes. Note the free budget is 750
+instance-hours/month and a permanently-awake service burns ~730 — fine for
+one service, but don't leave a pinger running all month if you later add a
+second free service.
+
+**Have the Codespace open as a backup.** It is a known-working environment;
+if something goes wrong with hosting mid-demo you can fall back to it
+rather than debugging live.
+
+**Rollback, if a deploy breaks something:**
+- Render → service → **Events** → redeploy the last good deploy
+- Vercel → project → **Deployments** → pick a previous one → **Promote to
+  Production**
+
+Both take under a minute and need no code changes.
+
+## If Render asks for a card
+
+Render's free web services shouldn't require one. If yours does, the
+closest no-card substitute is **Hugging Face Spaces** with the Docker SDK —
+genuinely free, and it only sleeps after 48 hours of inactivity rather than
+15 minutes, which is better demo behavior. It needs a small change (Spaces
+serve on port 7860, declared via `app_port` in the Space's README
+frontmatter). Ask and I'll write those steps out.
+
+## Moving to the production stack later
+
+This is a demo deployment, chosen under a zero-budget constraint. The
+product-wide architecture document targets Google Cloud SQL, Google Cloud
+Storage and Cloud Run. Nothing here blocks that migration — see
+ARCHITECTURE.md ADR-07 — but whoever owns the real launch environment
+should replace this document's steps rather than build on them, and should
+move PDF bytes out of Postgres and into object storage
+(`STORAGE_BACKEND=s3`) as part of that work.

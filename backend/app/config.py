@@ -36,10 +36,12 @@ class Settings(BaseSettings):
     max_upload_size_bytes: int = 10 * 1024 * 1024
     upload_storage_dir: str = "./storage/uploads"
 
-    # "local" (disk, dev-only — wiped on redeploy on most hosts) or "s3"
-    # (real AWS S3, or an S3-compatible provider like Cloudflare R2 via
-    # s3_endpoint_url). Required for any deployment where uploads must
-    # survive a restart.
+    # Where uploaded PDFs live. One of:
+    #   "local"    — disk, dev only; wiped on redeploy on most hosts
+    #   "database" — bytes in Postgres; no extra vendor/credentials needed
+    #   "s3"       — AWS S3, or S3-compatible (Cloudflare R2) via
+    #                s3_endpoint_url; the right choice past demo volumes
+    # Anything other than "local" survives a restart. See ADR-07.
     storage_backend: str = "local"
     s3_bucket_name: str = ""
     s3_region: str = "auto"
