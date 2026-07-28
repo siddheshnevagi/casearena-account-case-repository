@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: casearena
+      POSTGRES_PASSWORD: casearena
+      POSTGRES_DB: casearena
+    ports:
+      - "5432:5432"
+    volumes:
+      - casearena_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U casearena"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg2://casearena:casearena@db:5432/casearena
+      JWT_SECRET_KEY: local-dev-secret-not-for-production
+      CORS_ALLOW_ORIGINS: '["http://localhost:5173"]'
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./storage/uploads:/app/storage/uploads
+
+volumes:
+  casearena_pg_data:
