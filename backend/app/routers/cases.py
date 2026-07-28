@@ -190,7 +190,7 @@ def update_case(
     return case_to_out(case, current_user.id)
 
 
-@router.delete("/{case_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{case_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def delete_case(case_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> None:
     case = db.get(Case, case_id)
     if case is None or case.is_removed:
