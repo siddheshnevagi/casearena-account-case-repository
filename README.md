@@ -45,6 +45,7 @@ docs/
   API_CONTRACT.md         Integration contract for Team 1 / Team 3
   PRD_GAP_LOG.md          Quick index into ARCHITECTURE.md
   DEPLOYMENT.md            Checklist for a real hosted deployment (DB, object storage, backend, frontend)
+  INTEGRATION.md            Mapping this repo into the product-level platform repo
   source-materials/       Original PRD, RGD, agile plan, architecture doc
 .github/workflows/ci.yml  Backend tests (against Postgres) + frontend build
 ```
@@ -96,7 +97,9 @@ version history, email notifications, SMS password reset.
   Docker Compose / Alembic for real runs — see `backend/README.md`).
 - Frontend: implemented against the API contract above.
 - Not yet done: wiring this repository into the shared product-level
-  GitHub repo (each team currently has an independent local repo); real
+  GitHub repo (`susanthl1998/AI-Case-Preparation-Platform` — currently an
+  empty skeleton; see [`docs/INTEGRATION.md`](docs/INTEGRATION.md) for the
+  file mapping, the `/api/v1` question, and open items for the architect); real
   transactional email for signup verification (see ARCHITECTURE.md
   ADR-04); seeding the 25 launch cases called for in PRD §9 (a content
   task, not a code task).
