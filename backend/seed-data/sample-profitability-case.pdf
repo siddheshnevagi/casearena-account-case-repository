@@ -1,0 +1,130 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 4 0 R >> >> /MediaBox [0 0 612 792] /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 3143 >>
+stream
+BT
+/F1 11 Tf
+72 750 Td
+(CaseArena Practice Case) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+(Case Type: Profitability      Difficulty: Medium      Industry: Consumer Retail) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+(Prompt) Tj
+0 -14 Td
+(Our client, BrightBrew Coffee Co., operates a chain of 120 coffee shops across) Tj
+0 -14 Td
+(the Midwest. Over the past two years, despite stable revenue, the client's) Tj
+0 -14 Td
+(operating profit has declined by nearly 30%. The CEO has asked us to identify) Tj
+0 -14 Td
+(the root causes of the decline and recommend how to restore margins within 12) Tj
+0 -14 Td
+(months.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+(Guidance for the Candidate) Tj
+0 -14 Td
+(Take a moment to structure your approach before diving into the data. Consider:) Tj
+0 -14 Td
+(  - Revenue drivers: price, volume, and mix across the store network) Tj
+0 -14 Td
+(  - Cost drivers: COGS, labor, occupancy, and overhead) Tj
+0 -14 Td
+(  - External factors: competition, input costs, and macro trends) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+(Exhibit 1 -- Financial Summary \($ millions\)) Tj
+0 -14 Td
+(                          Year 1      Year 2      Year 3) Tj
+0 -14 Td
+(  Revenue                   180         182         184) Tj
+0 -14 Td
+(  COGS                        63          68          75) Tj
+0 -14 Td
+(  Gross Profit               117         114         109) Tj
+0 -14 Td
+(  Operating Expenses          72          76          83) Tj
+0 -14 Td
+(  Operating Profit            45          38          26) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+(Exhibit 2 -- Store-Level Metrics) Tj
+0 -14 Td
+(                          Year 1      Year 2      Year 3) Tj
+0 -14 Td
+(  Avg. daily txns/store      410         405         395) Tj
+0 -14 Td
+(  Avg. ticket size \($\)      5.80        5.95        6.05) Tj
+0 -14 Td
+(  Number of stores            115         118         120) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+(Suggested Framework \(check after attempting your own structure\)) Tj
+0 -14 Td
+(1. Revenue: store count grew \(+5\) and ticket size grew \(+4%\), but average) Tj
+0 -14 Td
+(   daily transactions per store fell \(~4%\) -- traffic softness, not pricing.) Tj
+0 -14 Td
+(2. Costs: COGS as a % of revenue rose from 35% to 41% -- check input cost) Tj
+0 -14 Td
+(   inflation \(coffee beans\) and portion/waste. Opex grew faster than revenue) Tj
+0 -14 Td
+(   too -- check labor cost per store and new-store overhead drag.) Tj
+0 -14 Td
+(3. Likely root cause: rising input costs plus overhead from rapid store) Tj
+0 -14 Td
+(   expansion, only partly offset by price increases, while underlying) Tj
+0 -14 Td
+(   traffic per store is softening -- likely competition or saturation.) Tj
+0 -14 Td
+(4. Directions to explore: renegotiate supplier contracts / hedge bean) Tj
+0 -14 Td
+(   prices, evaluate underperforming new stores, test targeted promotions) Tj
+0 -14 Td
+(   to rebuild traffic, review labor scheduling efficiency.) Tj
+0 -14 Td
+() Tj
+0 -14 Td
+(---) Tj
+0 -14 Td
+(This is a seeded practice case for the CaseArena MVP demo \(Module 2:) Tj
+0 -14 Td
+(Account Management & Case Repository\). Original content written for) Tj
+0 -14 Td
+(demo/testing purposes only -- not sourced from any published casebook.) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000311 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+3505
+%%EOF

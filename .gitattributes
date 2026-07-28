@@ -1,0 +1,9 @@
+# Binary formats must never go through Git's CRLF conversion — for a PDF
+# in particular, line-ending rewriting would shift bytes and silently
+# corrupt the xref table's byte offsets.
+*.pdf binary
+*.docx binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
