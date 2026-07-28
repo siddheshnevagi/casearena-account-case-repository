@@ -1,5 +1,11 @@
 """Case repository: browse/search/filter (US-04), upload and sharing
 (US-04B), and admin moderation (FR-11).
+
+Every endpoint returns ``case_to_out(case, current_user.id)`` explicitly
+rather than the raw ORM ``Case`` object — ``CaseOut`` has fields
+(``contributor``, ``is_owner``) that don't exist as attributes on ``Case``
+and can only be computed relative to the requesting user, so relying on
+FastAPI's ``response_model`` to auto-convert an ORM instance would fail.
 """
 from __future__ import annotations
 
@@ -31,6 +37,13 @@ def _visible_or_404(db: Session, case_id: int, current_user: User) -> Case:
     if not case.is_shared and not is_owner and not current_user.is_admin:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "case not found")
     return case
+
+
+def _tags_contain(keyword: str):
+    """Best-effort tag match across SQLite (JSON-as-text) and Postgres
+    (native JSON) without branching the whole query builder on dialect.
+    """
+    return cast(Case.tags, String).ilike(f"%{keyword}%")
 
 
 @router.get("", response_model=CaseListResponse)
@@ -78,7 +91,7 @@ def list_cases(
     items = query.offset((page - 1) * page_size).limit(page_size).all()
 
     return CaseListResponse(
-        items=[case_to_out(c) for c in items],
+        items=[case_to_out(c, current_user.id) for c in items],
         total=total,
         page=page,
         page_size=page_size,
@@ -86,16 +99,10 @@ def list_cases(
     )
 
 
-def _tags_contain(keyword: str):
-    """Best-effort tag match across SQLite (JSON-as-text) and Postgres
-    (native JSON) without branching the whole query builder on dialect.
-    """
-    return cast(Case.tags, String).ilike(f"%{keyword}%")
-
-
 @router.get("/{case_id}", response_model=CaseOut)
-def get_case(case_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Case:
-    return _visible_or_404(db, case_id, current_user)
+def get_case(case_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> CaseOut:
+    case = _visible_or_404(db, case_id, current_user)
+    return case_to_out(case, current_user.id)
 
 
 @router.get("/{case_id}/file")
@@ -121,7 +128,7 @@ async def upload_case(
     tags: str | None = Form(default=None, description="comma-separated"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> Case:
+) -> CaseOut:
     if file.content_type != "application/pdf":
         raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "only PDF files are accepted")
 
@@ -157,7 +164,7 @@ async def upload_case(
         get_storage().delete(storage_key)
         raise
     db.refresh(case)
-    return case
+    return case_to_out(case, current_user.id)
 
 
 @router.patch("/{case_id}", response_model=CaseOut)
@@ -166,7 +173,7 @@ def update_case(
     payload: CaseUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> Case:
+) -> CaseOut:
     case = db.get(Case, case_id)
     if case is None or case.is_removed:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "case not found")
@@ -180,7 +187,7 @@ def update_case(
 
     db.commit()
     db.refresh(case)
-    return case
+    return case_to_out(case, current_user.id)
 
 
 @router.delete("/{case_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -198,7 +205,7 @@ def delete_case(case_id: int, current_user: User = Depends(get_current_user), db
 
 
 @router.post("/{case_id}/share", response_model=CaseOut)
-def share_case(case_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Case:
+def share_case(case_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> CaseOut:
     case = db.get(Case, case_id)
     if case is None or case.is_removed:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "case not found")
@@ -209,11 +216,13 @@ def share_case(case_id: int, current_user: User = Depends(get_current_user), db:
     case.shared_at = dt.datetime.now(dt.timezone.utc)
     db.commit()
     db.refresh(case)
-    return case
+    return case_to_out(case, current_user.id)
 
 
 @router.post("/{case_id}/withdraw", response_model=CaseOut)
-def withdraw_case(case_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Case:
+def withdraw_case(
+    case_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> CaseOut:
     case = db.get(Case, case_id)
     if case is None or case.is_removed:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "case not found")
@@ -223,13 +232,13 @@ def withdraw_case(case_id: int, current_user: User = Depends(get_current_user), 
     case.is_shared = False
     db.commit()
     db.refresh(case)
-    return case
+    return case_to_out(case, current_user.id)
 
 
 @router.post("/{case_id}/practice", response_model=CaseOut)
 def record_practice(
     case_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
-) -> Case:
+) -> CaseOut:
     """Integration point for Team 1 (AI Trainer) — see docs/API_CONTRACT.md.
     Any authenticated user may log a practice event against a case they can
     see (their own, or a shared community case).
@@ -238,16 +247,16 @@ def record_practice(
     case.practice_count += 1
     db.commit()
     db.refresh(case)
-    return case
+    return case_to_out(case, current_user.id)
 
 
 @router.patch("/{case_id}/moderate", response_model=CaseOut)
 def moderate_case(
     case_id: int,
     payload: ModerateRequest,
-    _admin: User = Depends(get_current_admin),
+    admin: User = Depends(get_current_admin),
     db: Session = Depends(get_db),
-) -> Case:
+) -> CaseOut:
     case = db.get(Case, case_id)
     if case is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "case not found")
@@ -256,4 +265,4 @@ def moderate_case(
     case.removal_reason = payload.removal_reason
     db.commit()
     db.refresh(case)
-    return case
+    return case_to_out(case, admin.id)

@@ -33,12 +33,26 @@ def test_upload_creates_private_case_by_default(client, signup_and_login):
     assert resp.status_code == 201
     case = resp.json()
     assert case["is_shared"] is False
+    assert case["is_owner"] is True
 
     # Not visible to another user under the community scope.
     other_headers, _ = signup_and_login("other@iiml.ac.in", "supersecret1")
     listing = client.get("/cases", headers=other_headers)
     assert listing.json()["total"] == 0
     assert listing.json()["is_empty"] is True
+
+
+def test_is_owner_reflects_the_requesting_user_not_the_case(client, signup_and_login):
+    owner_headers, _ = signup_and_login("owner@iiml.ac.in", "supersecret1")
+    case_id = _upload(client, owner_headers).json()["id"]
+    client.post(f"/cases/{case_id}/share", headers=owner_headers)
+
+    other_headers, _ = signup_and_login("other@iiml.ac.in", "supersecret1")
+    as_owner = client.get(f"/cases/{case_id}", headers=owner_headers).json()
+    as_other = client.get(f"/cases/{case_id}", headers=other_headers).json()
+
+    assert as_owner["is_owner"] is True
+    assert as_other["is_owner"] is False
 
 
 def test_share_makes_case_visible_to_others_and_withdraw_hides_it(client, signup_and_login):

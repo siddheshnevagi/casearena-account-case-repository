@@ -102,5 +102,5 @@ def dashboard(current_user: User = Depends(get_current_user), db: Session = Depe
 
     return DashboardOut(
         profile=ProfileOut.model_validate(profile),
-        recommended_cases=[case_to_out(c) for c in cases],
+        recommended_cases=[case_to_out(c, current_user.id) for c in cases],
     )

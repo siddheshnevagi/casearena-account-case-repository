@@ -19,6 +19,10 @@ class CaseOut(BaseModel):
     original_filename: str
     file_size_bytes: int
     created_at: dt.datetime
+    # Computed relative to the requesting user (not a column) — lets a
+    # client show/hide edit, delete, share and moderate controls without
+    # guessing ownership from `contributor`, which is just a display name.
+    is_owner: bool
 
     model_config = {"from_attributes": True}
 

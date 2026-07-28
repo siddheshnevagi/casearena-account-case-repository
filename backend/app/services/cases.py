@@ -33,7 +33,7 @@ def case_types_for_preferences(case_preferences: list[str]) -> set[CaseType]:
     return matched
 
 
-def case_to_out(case: Case) -> CaseOut:
+def case_to_out(case: Case, viewer_id: int | None = None) -> CaseOut:
     contributor = "Anonymous" if case.owner_deleted or case.owner is None else case.owner.email.split("@")[0]
     return CaseOut(
         id=case.id,
@@ -48,4 +48,5 @@ def case_to_out(case: Case) -> CaseOut:
         original_filename=case.original_filename,
         file_size_bytes=case.file_size_bytes,
         created_at=case.created_at,
+        is_owner=viewer_id is not None and case.owner_id == viewer_id,
     )

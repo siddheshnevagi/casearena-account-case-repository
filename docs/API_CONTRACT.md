@@ -122,6 +122,12 @@ on; do not change without updating this document and notifying Team 1):
 - `difficulty`: `EASY | MEDIUM | HARD`
 - `industry`: free text, optional
 
+Every case object also carries `is_owner`: `true` only when the
+requesting user is the case's owner. It's computed per-request against the
+caller's token, not a stored property — use it to decide whether to show
+edit/delete/share/withdraw controls instead of trying to infer ownership
+from `contributor` (a display name, not an identifier).
+
 ### `GET /cases`
 Query params: `case_type`, `difficulty`, `industry`, `q` (keyword, matches
 title + tags, minimum 3 characters per FR/AC), `sort`
@@ -134,7 +140,7 @@ title + tags, minimum 3 characters per FR/AC), `sort`
     { "id": 1, "title": "…", "case_type": "MERGERS_ACQUISITIONS",
       "difficulty": "HARD", "industry": "Retail", "tags": ["M&A", "retail"],
       "contributor": "Jane D.", "is_shared": true, "practice_count": 4,
-      "created_at": "2026-07-01T12:00:00Z" }
+      "is_owner": false, "created_at": "2026-07-01T12:00:00Z" }
   ],
   "total": 0,
   "page": 1,
