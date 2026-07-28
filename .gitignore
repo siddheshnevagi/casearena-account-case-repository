@@ -1,0 +1,40 @@
+# --- Python / backend ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+*.db
+*.sqlite3
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# --- Node / frontend ---
+node_modules/
+dist/
+build/
+.vite/
+*.local
+
+# --- Env / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Uploaded files (local dev storage) ---
+backend/storage/uploads/**
+!backend/storage/uploads/.gitkeep
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+
+# --- Local tooling config (not part of the project) ---
+.claude/
