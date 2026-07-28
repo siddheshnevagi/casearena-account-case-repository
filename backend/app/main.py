@@ -34,6 +34,19 @@ app.include_router(cases.router)
 app.include_router(account.router)
 
 
+@app.get("/", tags=["health"])
+def root() -> dict:
+    """A bare 404 on the root URL is a bad first impression for anyone
+    landing on this service cold (a teammate on Team 1/3, a reviewer) —
+    point them at the interactive docs instead of leaving them guessing.
+    """
+    return {
+        "service": settings.app_name,
+        "docs": "/docs",
+        "health": "/health",
+    }
+
+
 @app.get("/health", tags=["health"])
 def health() -> dict:
     return {"status": "ok"}
